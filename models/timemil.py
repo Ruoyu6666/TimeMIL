@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import numpy as np
 
 import random
-
+from models.layers import *
 from models.inceptiontime import InceptionTimeFeatureExtractor
 from models.nystrom_attention import NystromAttention
 
@@ -26,7 +26,7 @@ def initialize_weights(model):
 
 
 class TransLayer(nn.Module):
-    def __init__(self, norm_layer=nn.LayerNorm, dropout=0.2,dim=512):
+    def __init__(self, norm_layer=nn.LayerNorm, dropout=0.2, dim=512):
         super().__init__()
         self.norm = norm_layer(dim)
         self.attn = NystromAttention(
@@ -113,11 +113,19 @@ class WaveletEncoding(nn.Module):
 
 
 class TimeMIL(nn.Module):
-    def __init__(self, in_features, n_classes=2, mDim=64, max_seq_len=400,dropout=0.):
+    def __init__(self, in_features, n_classes=2, mDim=64, 
+                 max_seq_len=400, dropout=0.,
+                 if_interval=True, instance_len=30
+                 ):
         super().__init__()
-
-        # Define backbone Can be replace here
-        self.feature_extractor = InceptionTimeFeatureExtractor(n_in_channels=in_features)
+        
+        self.if_interval = if_interval
+        if if_interval:
+            self.start_conv=StartConv(d_in=in_features, d_out=mDim)
+            self.feature_extractor = InceptionTimeFeatureExtractor(n_in_channels=mDim, out_channels=mDim//4)
+        else:
+            # Define backbone Can be replace here
+            self.feature_extractor = InceptionTimeFeatureExtractor(n_in_channels=in_features, out_channels=mDim//4)
 
         # Define WPE    
         self.cls_token = nn.Parameter(torch.randn(1, 1, mDim))
@@ -149,8 +157,8 @@ class TimeMIL(nn.Module):
             
         # define class token      
         self.cls_token = nn.Parameter(torch.randn(1, 1, mDim))
-        self.pos_layer =  WaveletEncoding(mDim,max_seq_len,hidden_len) 
-        self.pos_layer2 =  WaveletEncoding(mDim,max_seq_len,hidden_len) 
+        self.pos_layer =  WaveletEncoding(mDim, max_seq_len, hidden_len) 
+        self.pos_layer2 = WaveletEncoding(mDim, max_seq_len, hidden_len) 
         # self.pos_layer = ConvPosEncoding1D(mDim)
         self.layer1 = TransLayer(dim=mDim,dropout=dropout)
         self.layer2 = TransLayer(dim=mDim,dropout=dropout)
@@ -167,21 +175,22 @@ class TimeMIL(nn.Module):
         initialize_weights(self)
         
         
-    def forward(self, x,warmup=False):
+    def forward(self, x, warmup=False): #x:[15, 640, 2]
+        if self.if_interval:
+            x = self.start_conv(x)
 
-        x1 = self.feature_extractor(x.transpose(1, 2))
+        x1 = self.feature_extractor(x.transpose(1, 2)) # [15, 128, 640]
+        #print("x1")
+        #print(x1.size())
         x1 = x1.transpose(1, 2)
         x= x1
 
         B, seq_len, D = x.shape
-
         view_x = x.clone()
-      
         global_token = x.mean(dim=1)#[0]
       
         B = x.shape[0]
         cls_tokens = self.cls_token.expand(B, -1, -1)    #B * 1 * d
-      
         x = torch.cat((cls_tokens, x), dim=1)
         # WPE1
         x = self.pos_layer(x,self.wave1,self.wave2,self.wave3)

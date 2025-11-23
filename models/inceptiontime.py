@@ -128,7 +128,8 @@ class InceptionTimeFeatureExtractor(nn.Module):
 
     def __init__(
         self,
-        n_in_channels: int, out_channels: int = 32,
+        n_in_channels: int, 
+        out_channels: int = 32,
         padding_mode: str = "replicate",
     ):
         super().__init__()

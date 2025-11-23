@@ -45,7 +45,6 @@ def train(trainloader, milnet, criterion, optimizer, epoch, args):
     for batch_id, (feats, label) in enumerate(trainloader):
         bag_feats = feats.cuda()
         bag_label = label.cuda()
-        # print(bag_feats.shape)
         
         # window-based random masking
         if args.dropout_patch>0:
@@ -125,8 +124,7 @@ def test(testloader, milnet, criterion, args):
     r_marco = recall_score(test_labels,test_predictions,average='macro')
     r_micro = recall_score(test_labels,test_predictions,average='micro')
     
-    if args.num_classes ==2: 
-        # print(test_labels.shape)
+    if args.num_classes ==2:
         roc_auc_ovo_marco = roc_auc_score(test_labels,test_predictions_prob[:,1],average='macro')
         roc_auc_ovo_micro = 0.# roc_auc_score(test_labels,test_predictions_prob,average='micro',multi_class='ovo')
     
@@ -148,7 +146,7 @@ def test(testloader, milnet, criterion, args):
 
 def main():
     parser = argparse.ArgumentParser(description='time classification by TimeMIL')
-    parser.add_argument('--dataset', default="AtrialFibrillation", type=str, help='dataset ')
+    parser.add_argument('--dataset', default="RacketSports", type=str, help='dataset ')
     parser.add_argument('--num_classes', default=2, type=int, help='Number of output classes [2]')
     parser.add_argument('--num_workers', default=4, type=int, help='number of workers used in dataloader [4]')
     parser.add_argument('--feats_size', default=512, type=int, help='Dimension of the feature size [512] resnet-50 1024')
@@ -165,6 +163,9 @@ def main():
     parser.add_argument('--epoch_des', default=10, type=int, help='turn on warmup')
     parser.add_argument('--embed', default=128, type=int, help='Number of embedding')
     parser.add_argument('--batchsize', default=32, type=int, help='batchsize')
+
+    parser.add_argument('--if_interval', default=True, type=bool, help='if split the whole time series to intervals, each interval as an instance')
+    parser.add_argument('--instance_len', default=30, type=int, help='the length of instance')
     
     args = parser.parse_args()
     gpu_ids = tuple(args.gpu_index)
@@ -203,20 +204,24 @@ def main():
         args.num_classes =  num_classes
         print(f'num class:{args.num_classes}')
     
-    ### my own dataset ###
+    
     elif args.dataset in ["moseq"]:
-        data_path = "../datasets/moseq/data/pca_drug_test.pkl"
-        Xtr, ytr = load_classification_pkl(path = data_path, split='train') #(400, 10, 36000), (400,)
-        Xtr = torch.from_numpy(Xtr).permute(0,2,1).float()#[400, len, dim]
-        ytr =  F.one_hot(torch.tensor(ytr)).float()
-        trainset = TensorDataset(Xtr,ytr)
-        print(Xtr.size())
-
+        data_path = "../datasets/moseq/data/pca_drug.pkl"
+        Xtr, ytr = load_classification_pkl(path = data_path, split='train') #(400, 10, len), (400,)
         Xte, yte = load_classification_pkl(path = data_path, split='test')
-        Xte = torch.from_numpy(Xte).permute(0,2,1).float()
-        yte = F.one_hot(torch.tensor(yte)).float() #torch.Size([101, 1200, 10])
-        testset = TensorDataset(Xte, yte) #[101, 16]
-        
+        if args.if_interval:
+            Xtr = torch.from_numpy(Xtr).permute(0,2,3,1).float() #(400, 1200, 30, 10)
+            print(Xtr.shape)
+            Xte = torch.from_numpy(Xte).permute(0,2,3,1).float()
+        else:
+            Xtr = torch.from_numpy(Xtr).permute(0,2,1).float()# [400, len, dim]
+            Xte = torch.from_numpy(Xte).permute(0,2,1).float()# [101, len, 10]
+       
+        ytr = F.one_hot(torch.tensor(ytr)).float()
+        yte = F.one_hot(torch.tensor(yte)).float()
+        trainset = TensorDataset(Xtr,ytr)
+        testset = TensorDataset(Xte, yte)
+
         args.feats_size = Xte.shape[-1]
         L_in = Xte.shape[-1]
         num_classes = yte.shape[-1]
@@ -229,9 +234,9 @@ def main():
         word_to_idx = {}
         for i in range(len(meta['class_values'])):
             word_to_idx[meta['class_values'][i]]=i # {'n': 0, 's': 1, 't': 2}
-        Xtr = torch.from_numpy(Xtr).permute(0,2,1).float() #[15, 2, 640] -> [15, 640, 2]
+        Xtr = torch.from_numpy(Xtr).permute(0,2,1).float() # -> [15, 640, 2]
         ytr = [word_to_idx[i] for i in ytr]
-        ytr =  F.one_hot(torch.tensor(ytr)).float() #torch.Size([15, 3])
+        ytr =  F.one_hot(torch.tensor(ytr)).float()        # [15, 3]
         trainset = TensorDataset(Xtr,ytr)
 
         Xte, yte = load_classification(name=args.dataset, split='test')
@@ -251,7 +256,8 @@ def main():
     
     # <------------- define MIL network ------------->
     milnet = TimeMIL(args.feats_size, mDim=args.embed, n_classes =num_classes, 
-                     dropout=args.dropout_node, max_seq_len = seq_len).cuda()
+                     dropout=args.dropout_node, max_seq_len = seq_len,
+                     if_interval=args.if_interval, instance_len=args.instance_len).cuda()
     
     if  args.optimizer == 'adamw':
         optimizer = torch.optim.AdamW(milnet.parameters(), lr=args.lr, weight_decay=args.weight_decay)

@@ -7,6 +7,30 @@ import torch.nn.functional as F
 
 
 
+class StartConv(nn.Module):
+    def __init__(self, d_in, d_out, hidden=128):
+        super().__init__()
+
+        # Conv1D scans over time only
+        self.conv = nn.Conv1d(
+            in_channels=d_in,      # feature dims
+            out_channels=hidden,   # new feature channels
+            kernel_size=3,
+            padding=1
+        )
+        self.d_out = d_out
+        self.fc = nn.Linear(hidden, d_out)  # Final projection to output size D
+
+    def forward(self, x):
+        B, N, T, D = x.shape                    
+        x = x.reshape(B * N, T, D).permute(0, 2, 1) # (B * N, D, T)
+        x = torch.relu(self.conv(x))         # (B*N, hidden, T)
+        x = x.mean(dim=-1)                   # Global average pooling over time: (B*N, hidden)
+        x = self.fc(x)                       # Project to output dimension: (B*N, d_out)
+
+        # reshape back
+        return x.reshape(B, N, self.d_out)
+
 
 class LayerNorm(nn.Module):
     __constants__ = ['normalized_shape', 'weight', 'bias', 'eps', 'elementwise_affine']
