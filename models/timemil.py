@@ -5,14 +5,11 @@ import torch.nn.functional as F
 import numpy as np
 
 import random
-from models.layers import *
+from models.common import *
 from models.inceptiontime import InceptionTimeFeatureExtractor
 from models.nystrom_attention import NystromAttention
 
 
-
-# from inceptiontime import InceptionTimeFeatureExtractor
-# from nystrom_attention import NystromAttention
 def initialize_weights(model):
     for m in model.modules():
         if isinstance(m, nn.Linear):

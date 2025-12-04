@@ -210,7 +210,7 @@ def main():
         Xtr, ytr = load_classification_pkl(path = data_path, split='train') #(400, 10, len), (400,)
         Xte, yte = load_classification_pkl(path = data_path, split='test')
         if args.if_interval:
-            Xtr = torch.from_numpy(Xtr).permute(0,2,3,1).float() #(400, 1200, 30, 10)
+            Xtr = torch.from_numpy(Xtr).permute(0,2,3,1).float() #(400, 1200, 30, 10)  (B, N, T, D)
             print(Xtr.shape)
             Xte = torch.from_numpy(Xte).permute(0,2,3,1).float()
         else:

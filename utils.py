@@ -140,7 +140,7 @@ def load_classification_pkl(
     d = data["X"].shape[1]
      # cut the whole time series into intervals, each interval an instance
     if if_interval:
-        X = X.reshape(bag_num, d, -1, instance_len) # (501, 10, 1200, 30)(B, D, N, T) -> (B, N, T, D)
+        X = X.reshape(bag_num, d, -1, instance_len) # (501, 10, 1200, 30)(B, D, N, T) 
 
     from sklearn.model_selection import train_test_split
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state)

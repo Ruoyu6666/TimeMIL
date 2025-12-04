@@ -1,13 +1,16 @@
 # -*- coding: utf-8 -*-
 import pickle
+import sys, argparse, os
 import numpy as np
 import pandas as pd
-import torch
+
 from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split
+
+import torch
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
-import sys, argparse, os
+
 from utils import *
 
 from aeon.datasets import load_classification
