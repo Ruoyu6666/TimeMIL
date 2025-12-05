@@ -11,9 +11,11 @@ import torch.nn.functional as F
 import numbers
 
 
+# when each instance is
 class StartConv(nn.Module):
-    def __init__(self, d_in: int, d_out: int, kernel_size: int =3,
-                stride: int = 1, padding: int = 0
+    def __init__(self, d_in: int, d_out: int, 
+                 kernel_size: int =3,
+                 stride: int = 1, padding: int = 0
                 ):
         super().__init__()
         self.conv = nn.Conv1d(

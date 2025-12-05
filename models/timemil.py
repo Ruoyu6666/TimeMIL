@@ -55,7 +55,6 @@ def mexican_hat_wavelet(size, scale, shift): #size :d*kernelsize  scale:d*1 shif
     Returns:
     torch.Tensor: Mexican Hat wavelet kernel.
     """
-  
     x = torch.linspace(-( size[1]-1)//2, ( size[1]-1)//2, size[1]).cuda()
     # print(x.shape)
     x = x.reshape(1,-1).repeat(size[0],1)
@@ -115,7 +114,7 @@ class TimeMIL(nn.Module):
                  if_interval=True, instance_len=30
                  ):
         super().__init__()
-        
+        # if split the whole time series into intervals, each interval an instance
         self.if_interval = if_interval
         if if_interval:
             self.start_conv=StartConv(d_in=in_features, d_out=mDim)

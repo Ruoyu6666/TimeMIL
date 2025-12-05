@@ -46,11 +46,10 @@ def train(trainloader, milnet, criterion, optimizer, epoch, args):
         bag_feats = feats.cuda()
         bag_label = label.cuda()
         
-        # window-based random masking
+        # Window-based random masking
         if args.dropout_patch>0:
             selecy_window_indx = random.sample(range(10),int(args.dropout_patch*10))
             inteval = int(len(bag_feats)//10)
-            
             for idx in selecy_window_indx:
                 bag_feats[:, idx*inteval:idx*inteval+inteval,:] = torch.randn(1).cuda()
    
@@ -71,7 +70,6 @@ def train(trainloader, milnet, criterion, optimizer, epoch, args):
         # avoid the overfitting by using gradient clip
         torch.nn.utils.clip_grad_norm_(milnet.parameters(), 2.0)
         optimizer.step()
-
         # total_loss = total_loss + loss.item()
         total_loss = total_loss + bag_loss
       
@@ -91,7 +89,6 @@ def test(testloader, milnet, criterion, args):
         for batch_id, (feats, label) in enumerate(testloader):
             bag_feats = feats.cuda()
             bag_label = label.cuda()
-         
             bag_prediction = milnet(bag_feats)  #b*class
             bag_loss = criterion(bag_prediction, bag_label)
             
@@ -147,6 +144,7 @@ def test(testloader, milnet, criterion, args):
 def main():
     parser = argparse.ArgumentParser(description='time classification by TimeMIL')
     parser.add_argument('--dataset', default="RacketSports", type=str, help='dataset ')
+    parser.add_argument('--data_path', default="../../../datasets/MaBe/mouse")
     parser.add_argument('--num_classes', default=2, type=int, help='Number of output classes [2]')
     parser.add_argument('--num_workers', default=4, type=int, help='number of workers used in dataloader [4]')
     parser.add_argument('--feats_size', default=512, type=int, help='Dimension of the feature size [512] resnet-50 1024')
@@ -164,7 +162,7 @@ def main():
     parser.add_argument('--embed', default=128, type=int, help='Number of embedding')
     parser.add_argument('--batchsize', default=32, type=int, help='batchsize')
 
-    parser.add_argument('--if_interval', default=True, type=bool, help='if split the whole time series to intervals, each interval as an instance')
+    parser.add_argument('--if_interval', default=False, type=bool, help='if split the whole time series to intervals, each interval as an instance')
     parser.add_argument('--instance_len', default=30, type=int, help='the length of instance')
     
     args = parser.parse_args()
@@ -205,8 +203,9 @@ def main():
         print(f'num class:{args.num_classes}')
     
     
-    elif args.dataset in ["moseq"]:
-        data_path = "../datasets/moseq/data/pca_drug.pkl"
+    elif args.dataset in ["moseq","mabe_mouse"]:
+        #data_path = "../datasets/moseq/data/pca_drug.pkl"
+        data_path = "../../../datasets/MaBe/mouse/keypoints_light.pkl"
         Xtr, ytr = load_classification_pkl(path = data_path, split='train') #(400, 10, len), (400,)
         Xte, yte = load_classification_pkl(path = data_path, split='test')
         if args.if_interval:
