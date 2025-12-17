@@ -143,13 +143,13 @@ def test(testloader, milnet, criterion, args):
 
 def main():
     parser = argparse.ArgumentParser(description='time classification by TimeMIL')
-    parser.add_argument('--dataset', default="RacketSports", type=str, help='dataset ')
+    parser.add_argument('--dataset', default="mabe_mouse_72", type=str, help='dataset ')
     parser.add_argument('--data_path', default="../../../datasets/MaBe/mouse")
     parser.add_argument('--num_classes', default=2, type=int, help='Number of output classes [2]')
     parser.add_argument('--num_workers', default=4, type=int, help='number of workers used in dataloader [4]')
     parser.add_argument('--feats_size', default=512, type=int, help='Dimension of the feature size [512] resnet-50 1024')
-    parser.add_argument('--lr', default=5e-3, type=float, help='1e-3 Initial learning rate [0.0002]')
-    parser.add_argument('--num_epochs', default=200, type=int, help='Number of total training epochs [40|200]')
+    parser.add_argument('--lr', default=1e-3, type=float, help='1e-3 Initial learning rate [0.0002]')
+    parser.add_argument('--num_epochs', default=100, type=int, help='Number of total training epochs [40|200]')
     parser.add_argument('--gpu_index', type=int, nargs='+', default=(0,), help='GPU ID(s) [0]')
     parser.add_argument('--weight_decay', default=1e-4, type=float, help='Weight decay 1e-4]')
     parser.add_argument('--dropout_patch', default=0.5, type=float, help='Patch dropout rate [0] 0.5')
@@ -160,7 +160,7 @@ def main():
     parser.add_argument('--save_dir', default='./savemodel/', type=str, help='the directory used to save all the output')
     parser.add_argument('--epoch_des', default=10, type=int, help='turn on warmup')
     parser.add_argument('--embed', default=128, type=int, help='Number of embedding')
-    parser.add_argument('--batchsize', default=32, type=int, help='batchsize')
+    parser.add_argument('--batchsize', default=128, type=int, help='batchsize')
 
     parser.add_argument('--if_interval', default=False, type=bool, help='if split the whole time series to intervals, each interval as an instance')
     parser.add_argument('--instance_len', default=30, type=int, help='the length of instance')
@@ -203,19 +203,17 @@ def main():
         print(f'num class:{args.num_classes}')
     
     
-    elif args.dataset in ["moseq","mabe_mouse"]:
+    elif args.dataset in ["moseq","mabe_mouse_72"]:
         #data_path = "../datasets/moseq/data/pca_drug.pkl"
-        data_path = "../../../datasets/MaBe/mouse/keypoints_light.pkl"
-        Xtr, ytr = load_classification_pkl(path = data_path, split='train') #(400, 10, len), (400,)
-        Xte, yte = load_classification_pkl(path = data_path, split='test')
+        #data_path = "../../../data/MaBe/keypoints_light.pkl"
+        Xtr, ytr = load_classification_pkl(path = "../../../data/MaBe/mouse/mouse_train_lights.pkl")  #(400, 10, len), (400,)
+        Xte, yte = load_classification_pkl(path = "../../../data/MaBe/mouse/mouse_test_lights.pkl")
         if args.if_interval:
             Xtr = torch.from_numpy(Xtr).permute(0,2,3,1).float() #(400, 1200, 30, 10)  (B, N, T, D)
-            print(Xtr.shape)
             Xte = torch.from_numpy(Xte).permute(0,2,3,1).float()
         else:
             Xtr = torch.from_numpy(Xtr).permute(0,2,1).float()# [400, len, dim]
             Xte = torch.from_numpy(Xte).permute(0,2,1).float()# [101, len, 10]
-       
         ytr = F.one_hot(torch.tensor(ytr)).float()
         yte = F.one_hot(torch.tensor(yte)).float()
         trainset = TensorDataset(Xtr,ytr)
@@ -252,12 +250,16 @@ def main():
         print(f'num class:{args.num_classes}' )
     
     
-    
     # <------------- define MIL network ------------->
     milnet = TimeMIL(args.feats_size, mDim=args.embed, n_classes =num_classes, 
                      dropout=args.dropout_node, max_seq_len = seq_len,
                      if_interval=args.if_interval, instance_len=args.instance_len).cuda()
     
+    # total number of trainable model parameters
+    total_params = sum(p.numel() for p in  milnet.parameters() if p.requires_grad)
+    print(f'Total number of parameters: {total_params}')
+
+
     if  args.optimizer == 'adamw':
         optimizer = torch.optim.AdamW(milnet.parameters(), lr=args.lr, weight_decay=args.weight_decay)
         optimizer = Lookahead(optimizer)

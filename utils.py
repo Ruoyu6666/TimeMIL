@@ -127,19 +127,21 @@ def split_path(path: str) -> List[str]:
 
 def load_classification_pkl(
     path: str, 
-    split: Optional[str] = None,       # None, "train", "test"
+    split: Optional[str] = None, # None, "train", "test"
     test_size: float = 0.2, 
     random_state: int = 42,
     if_interval: bool = False, 
-    instance_len: int = 30      # the length of interval
+    instance_len: int = 30       # the length of each patch
 ):
     data = load_pickle(path)
     X, y = data["X"], data["y"] # (B, D, L)
+    if split == None:
+        return X, y
     
     bag_num = len(X)
     d = data["X"].shape[1]
 
-    if if_interval: # if split the whole time series into intervals, each interval an instance
+    if if_interval: # if patch the whole time series, each interval an instance
         X = X.reshape(bag_num, d, -1, instance_len) # (501, 10, 1200, 30)(B, D, N, T) L = N * T
 
     from sklearn.model_selection import train_test_split
